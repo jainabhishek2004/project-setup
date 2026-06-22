@@ -1,0 +1,6 @@
+**/build
+**/public
+dist
+package-lock.json
+pnpm-lock.yaml
+routeTree.gen.ts
