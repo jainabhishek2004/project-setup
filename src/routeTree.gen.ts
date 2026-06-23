@@ -15,7 +15,10 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedSettingsRouteImport } from './routes/_authed/settings'
+import { Route as AuthedRoutesIndexRouteImport } from './routes/_authed/routes/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AuthedRoutesNewRouteImport } from './routes/_authed/routes/new'
+import { Route as AuthedRoutesRouteIdRouteImport } from './routes/_authed/routes/$routeId'
 
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
@@ -46,10 +49,25 @@ const AuthedSettingsRoute = AuthedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedRoutesIndexRoute = AuthedRoutesIndexRouteImport.update({
+  id: '/routes/',
+  path: '/routes/',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedRoutesNewRoute = AuthedRoutesNewRouteImport.update({
+  id: '/routes/new',
+  path: '/routes/new',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedRoutesRouteIdRoute = AuthedRoutesRouteIdRouteImport.update({
+  id: '/routes/$routeId',
+  path: '/routes/$routeId',
+  getParentRoute: () => AuthedRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -58,7 +76,10 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/settings': typeof AuthedSettingsRoute
+  '/routes/$routeId': typeof AuthedRoutesRouteIdRoute
+  '/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/routes/': typeof AuthedRoutesIndexRoute
 }
 export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
@@ -66,7 +87,10 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/settings': typeof AuthedSettingsRoute
   '/': typeof AuthedIndexRoute
+  '/routes/$routeId': typeof AuthedRoutesRouteIdRoute
+  '/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/routes': typeof AuthedRoutesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -76,7 +100,10 @@ export interface FileRoutesById {
   '/sign-up': typeof SignUpRoute
   '/_authed/settings': typeof AuthedSettingsRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/routes/$routeId': typeof AuthedRoutesRouteIdRoute
+  '/_authed/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/_authed/routes/': typeof AuthedRoutesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -86,7 +113,10 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/settings'
+    | '/routes/$routeId'
+    | '/routes/new'
     | '/api/auth/$'
+    | '/routes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/reset-password'
@@ -94,7 +124,10 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/settings'
     | '/'
+    | '/routes/$routeId'
+    | '/routes/new'
     | '/api/auth/$'
+    | '/routes'
   id:
     | '__root__'
     | '/_authed'
@@ -103,7 +136,10 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/_authed/settings'
     | '/_authed/'
+    | '/_authed/routes/$routeId'
+    | '/_authed/routes/new'
     | '/api/auth/$'
+    | '/_authed/routes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -158,6 +194,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSettingsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/routes/': {
+      id: '/_authed/routes/'
+      path: '/routes'
+      fullPath: '/routes/'
+      preLoaderRoute: typeof AuthedRoutesIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -165,17 +208,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authed/routes/new': {
+      id: '/_authed/routes/new'
+      path: '/routes/new'
+      fullPath: '/routes/new'
+      preLoaderRoute: typeof AuthedRoutesNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/routes/$routeId': {
+      id: '/_authed/routes/$routeId'
+      path: '/routes/$routeId'
+      fullPath: '/routes/$routeId'
+      preLoaderRoute: typeof AuthedRoutesRouteIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
 interface AuthedRouteChildren {
   AuthedSettingsRoute: typeof AuthedSettingsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedRoutesRouteIdRoute: typeof AuthedRoutesRouteIdRoute
+  AuthedRoutesNewRoute: typeof AuthedRoutesNewRoute
+  AuthedRoutesIndexRoute: typeof AuthedRoutesIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsRoute: AuthedSettingsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
+  AuthedRoutesRouteIdRoute: AuthedRoutesRouteIdRoute,
+  AuthedRoutesNewRoute: AuthedRoutesNewRoute,
+  AuthedRoutesIndexRoute: AuthedRoutesIndexRoute,
 }
 
 const AuthedRouteWithChildren =
