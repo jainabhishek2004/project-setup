@@ -21,9 +21,11 @@ import type * as generation from "../generation.js";
 import type * as http from "../http.js";
 import type * as lib_geo from "../lib/geo.js";
 import type * as lib_iot from "../lib/iot.js";
+import type * as lib_osrm from "../lib/osrm.js";
 import type * as lib_time from "../lib/time.js";
 import type * as polling from "../polling.js";
 import type * as routes from "../routes.js";
+import type * as routing from "../routing.js";
 import type * as todos from "../todos.js";
 import type * as vehicles from "../vehicles.js";
 
@@ -47,9 +49,11 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/geo": typeof lib_geo;
   "lib/iot": typeof lib_iot;
+  "lib/osrm": typeof lib_osrm;
   "lib/time": typeof lib_time;
   polling: typeof polling;
   routes: typeof routes;
+  routing: typeof routing;
   todos: typeof todos;
   vehicles: typeof vehicles;
 }>;

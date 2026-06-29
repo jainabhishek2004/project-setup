@@ -23,6 +23,12 @@ export default defineSchema({
     name: v.string(),
     vehicleRegistration: v.string(),
     isActive: v.boolean(),
+    // Start/origin point (parking/depot) where the vehicle begins the day.
+    // Optional so routes created before this feature still validate.
+    startName: v.optional(v.string()),
+    startLat: v.optional(v.number()),
+    startLng: v.optional(v.number()),
+    startExpectedMinutes: v.optional(v.number()), // departure time, minutes from midnight (IST)
   }).index('by_user', ['userId']),
 
   // Ordered drop points belonging to a configured route.
@@ -61,6 +67,9 @@ export default defineSchema({
     userId: v.id('users'),
     // Denormalized from the daily route so the polling cron can group by vehicle.
     vehicleRegistration: v.string(),
+    // The route's start/origin point sorts first (order -1) and is rendered
+    // distinctly; everything else (polling, geofence capture) is identical.
+    isStart: v.optional(v.boolean()),
     order: v.number(),
     name: v.string(),
     targetLat: v.number(),

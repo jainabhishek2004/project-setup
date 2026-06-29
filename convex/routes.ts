@@ -10,6 +10,14 @@ const stopInput = v.object({
   expectedMinutes: v.number(),
 })
 
+// The route's start/origin point (parking/depot) + departure time.
+const startInput = v.object({
+  name: v.string(),
+  lat: v.number(),
+  lng: v.number(),
+  expectedMinutes: v.number(),
+})
+
 // All configured routes for the current user, each with its ordered stops.
 export const list = query({
   args: {},
@@ -56,6 +64,7 @@ export const create = mutation({
   args: {
     name: v.string(),
     vehicleRegistration: v.string(),
+    start: startInput,
     stops: v.array(stopInput),
   },
   handler: async (ctx, args) => {
@@ -65,6 +74,10 @@ export const create = mutation({
       name: args.name.trim(),
       vehicleRegistration: args.vehicleRegistration.trim(),
       isActive: true,
+      startName: args.start.name.trim(),
+      startLat: args.start.lat,
+      startLng: args.start.lng,
+      startExpectedMinutes: args.start.expectedMinutes,
     })
     await insertStops(ctx, routeId, args.stops)
     return routeId
@@ -76,6 +89,7 @@ export const update = mutation({
     id: v.id('routes'),
     name: v.string(),
     vehicleRegistration: v.string(),
+    start: startInput,
     stops: v.array(stopInput),
   },
   handler: async (ctx, args) => {
@@ -87,6 +101,10 @@ export const update = mutation({
     await ctx.db.patch(args.id, {
       name: args.name.trim(),
       vehicleRegistration: args.vehicleRegistration.trim(),
+      startName: args.start.name.trim(),
+      startLat: args.start.lat,
+      startLng: args.start.lng,
+      startExpectedMinutes: args.start.expectedMinutes,
     })
     // Replace stops wholesale — simplest correct approach for an edit form.
     await deleteStops(ctx, args.id)

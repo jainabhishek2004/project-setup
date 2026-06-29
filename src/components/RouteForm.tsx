@@ -32,16 +32,24 @@ function timeToMinutes(time: string): number {
   return h * 60 + m
 }
 
+type Point = { name: string; lat: number; lng: number; expectedMinutes: number }
+
 export type RouteFormInitial = {
   id: Id<'routes'>
   name: string
   vehicleRegistration: string
-  stops: Array<{
-    name: string
-    lat: number
-    lng: number
-    expectedMinutes: number
-  }>
+  start?: Point | null
+  stops: Array<Point>
+}
+
+function pointToDraft(p?: Point | null): StopDraft {
+  if (!p) return emptyStop()
+  return {
+    name: p.name,
+    lat: String(p.lat),
+    lng: String(p.lng),
+    time: minutesToTime(p.expectedMinutes),
+  }
 }
 
 export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
@@ -51,17 +59,16 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
 
   const [name, setName] = useState(initial?.name ?? '')
   const [vehicle, setVehicle] = useState(initial?.vehicleRegistration ?? '')
+  const [start, setStart] = useState<StopDraft>(pointToDraft(initial?.start))
   const [stops, setStops] = useState<StopDraft[]>(
-    initial
-      ? initial.stops.map((s) => ({
-          name: s.name,
-          lat: String(s.lat),
-          lng: String(s.lng),
-          time: minutesToTime(s.expectedMinutes),
-        }))
+    initial && initial.stops.length > 0
+      ? initial.stops.map((s) => pointToDraft(s))
       : [emptyStop()],
   )
   const [saving, setSaving] = useState(false)
+
+  const updateStart = (patch: Partial<StopDraft>) =>
+    setStart((prev) => ({ ...prev, ...patch }))
 
   const updateStop = (index: number, patch: Partial<StopDraft>) => {
     setStops((prev) =>
@@ -78,12 +85,26 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
       toast.error('Route name and vehicle number are required')
       return
     }
-    const parsedStops: Array<{
-      name: string
-      lat: number
-      lng: number
-      expectedMinutes: number
-    }> = []
+
+    const startLat = Number(start.lat)
+    const startLng = Number(start.lng)
+    if (
+      !start.name.trim() ||
+      !start.time ||
+      Number.isNaN(startLat) ||
+      Number.isNaN(startLng)
+    ) {
+      toast.error('Start point needs a name, departure time, and valid lat/lng')
+      return
+    }
+    const parsedStart: Point = {
+      name: start.name.trim(),
+      lat: startLat,
+      lng: startLng,
+      expectedMinutes: timeToMinutes(start.time),
+    }
+
+    const parsedStops: Array<Point> = []
     for (const s of stops) {
       const lat = Number(s.lat)
       const lng = Number(s.lng)
@@ -110,11 +131,17 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
           id: initial.id,
           name,
           vehicleRegistration: vehicle,
+          start: parsedStart,
           stops: parsedStops,
         })
         toast.success('Route updated')
       } else {
-        await create({ name, vehicleRegistration: vehicle, stops: parsedStops })
+        await create({
+          name,
+          vehicleRegistration: vehicle,
+          start: parsedStart,
+          stops: parsedStops,
+        })
         toast.success('Route created')
       }
       await navigate({ to: '/routes' })
@@ -155,6 +182,50 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
       </Card>
 
       <Card>
+        <CardHeader>
+          <CardTitle>Start point</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+            <div className="grid gap-1">
+              <Label className="text-xs">Start / parking name</Label>
+              <Input
+                value={start.name}
+                onChange={(e) => updateStart({ name: e.target.value })}
+                placeholder="Depot / Parking"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-xs">Latitude</Label>
+              <Input
+                value={start.lat}
+                onChange={(e) => updateStart({ lat: e.target.value })}
+                placeholder="19.0760"
+                inputMode="decimal"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-xs">Longitude</Label>
+              <Input
+                value={start.lng}
+                onChange={(e) => updateStart({ lng: e.target.value })}
+                placeholder="72.8777"
+                inputMode="decimal"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-xs">Departure time</Label>
+              <Input
+                type="time"
+                value={start.time}
+                onChange={(e) => updateStart({ time: e.target.value })}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Drop points</CardTitle>
           <Button type="button" variant="secondary" size="sm" onClick={addStop}>
@@ -162,6 +233,10 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-muted-foreground text-xs">
+            The operational day runs 5 PM–7 AM. Times from 5 PM onward are this
+            evening; times before 5 PM count as the next morning.
+          </p>
           {stops.map((stop, index) => (
             <div
               key={index}

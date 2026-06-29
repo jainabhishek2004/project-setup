@@ -19,6 +19,7 @@ import { Route as AuthedRoutesIndexRouteImport } from './routes/_authed/routes/i
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthedRoutesNewRouteImport } from './routes/_authed/routes/new'
 import { Route as AuthedRoutesRouteIdRouteImport } from './routes/_authed/routes/$routeId'
+import { Route as AuthedDailyDailyRouteIdRouteImport } from './routes/_authed/daily/$dailyRouteId'
 
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
@@ -69,6 +70,11 @@ const AuthedRoutesRouteIdRoute = AuthedRoutesRouteIdRouteImport.update({
   path: '/routes/$routeId',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedDailyDailyRouteIdRoute = AuthedDailyDailyRouteIdRouteImport.update({
+  id: '/daily/$dailyRouteId',
+  path: '/daily/$dailyRouteId',
+  getParentRoute: () => AuthedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/settings': typeof AuthedSettingsRoute
+  '/daily/$dailyRouteId': typeof AuthedDailyDailyRouteIdRoute
   '/routes/$routeId': typeof AuthedRoutesRouteIdRoute
   '/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/settings': typeof AuthedSettingsRoute
   '/': typeof AuthedIndexRoute
+  '/daily/$dailyRouteId': typeof AuthedDailyDailyRouteIdRoute
   '/routes/$routeId': typeof AuthedRoutesRouteIdRoute
   '/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/sign-up': typeof SignUpRoute
   '/_authed/settings': typeof AuthedSettingsRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/daily/$dailyRouteId': typeof AuthedDailyDailyRouteIdRoute
   '/_authed/routes/$routeId': typeof AuthedRoutesRouteIdRoute
   '/_authed/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/settings'
+    | '/daily/$dailyRouteId'
     | '/routes/$routeId'
     | '/routes/new'
     | '/api/auth/$'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/settings'
     | '/'
+    | '/daily/$dailyRouteId'
     | '/routes/$routeId'
     | '/routes/new'
     | '/api/auth/$'
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/_authed/settings'
     | '/_authed/'
+    | '/_authed/daily/$dailyRouteId'
     | '/_authed/routes/$routeId'
     | '/_authed/routes/new'
     | '/api/auth/$'
@@ -222,12 +234,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedRoutesRouteIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/daily/$dailyRouteId': {
+      id: '/_authed/daily/$dailyRouteId'
+      path: '/daily/$dailyRouteId'
+      fullPath: '/daily/$dailyRouteId'
+      preLoaderRoute: typeof AuthedDailyDailyRouteIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
 interface AuthedRouteChildren {
   AuthedSettingsRoute: typeof AuthedSettingsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedDailyDailyRouteIdRoute: typeof AuthedDailyDailyRouteIdRoute
   AuthedRoutesRouteIdRoute: typeof AuthedRoutesRouteIdRoute
   AuthedRoutesNewRoute: typeof AuthedRoutesNewRoute
   AuthedRoutesIndexRoute: typeof AuthedRoutesIndexRoute
@@ -236,6 +256,7 @@ interface AuthedRouteChildren {
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsRoute: AuthedSettingsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
+  AuthedDailyDailyRouteIdRoute: AuthedDailyDailyRouteIdRoute,
   AuthedRoutesRouteIdRoute: AuthedRoutesRouteIdRoute,
   AuthedRoutesNewRoute: AuthedRoutesNewRoute,
   AuthedRoutesIndexRoute: AuthedRoutesIndexRoute,

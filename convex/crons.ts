@@ -3,11 +3,11 @@ import { internal } from './_generated/api'
 
 const crons = cronJobs()
 
-// Generate today's daily routes for all active routes at 00:00 IST.
-// IST = UTC+5:30, so that is 18:30 UTC the previous day.
+// The operational day starts at 5 PM IST, so generate that day's routes right
+// as the window opens. 5 PM IST = 11:30 UTC.
 crons.daily(
   'generate-daily-routes',
-  { hourUTC: 18, minuteUTC: 30 },
+  { hourUTC: 11, minuteUTC: 30 },
   internal.generation.generateDaily,
 )
 
