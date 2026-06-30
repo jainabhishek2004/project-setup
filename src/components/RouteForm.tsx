@@ -15,11 +15,15 @@ type StopDraft = {
   name: string
   lat: string
   lng: string
-  // "HH:mm" from <input type="time">
-  time: string
+  radius: string
 }
 
-const emptyStop = (): StopDraft => ({ name: '', lat: '', lng: '', time: '' })
+const emptyStop = (): StopDraft => ({
+  name: '',
+  lat: '',
+  lng: '',
+  radius: '100',
+})
 
 function minutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60)
@@ -32,24 +36,18 @@ function timeToMinutes(time: string): number {
   return h * 60 + m
 }
 
-type Point = { name: string; lat: number; lng: number; expectedMinutes: number }
-
 export type RouteFormInitial = {
   id: Id<'routes'>
   name: string
   vehicleRegistration: string
-  start?: Point | null
-  stops: Array<Point>
-}
-
-function pointToDraft(p?: Point | null): StopDraft {
-  if (!p) return emptyStop()
-  return {
-    name: p.name,
-    lat: String(p.lat),
-    lng: String(p.lng),
-    time: minutesToTime(p.expectedMinutes),
-  }
+  activeStartMinutes?: number
+  activeEndMinutes?: number
+  stops: Array<{
+    name: string
+    lat: number
+    lng: number
+    radiusMeters?: number
+  }>
 }
 
 export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
@@ -59,22 +57,32 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
 
   const [name, setName] = useState(initial?.name ?? '')
   const [vehicle, setVehicle] = useState(initial?.vehicleRegistration ?? '')
-  const [start, setStart] = useState<StopDraft>(pointToDraft(initial?.start))
+  const [activeStart, setActiveStart] = useState(
+    initial?.activeStartMinutes != null
+      ? minutesToTime(initial.activeStartMinutes)
+      : '17:00',
+  )
+  const [activeEnd, setActiveEnd] = useState(
+    initial?.activeEndMinutes != null
+      ? minutesToTime(initial.activeEndMinutes)
+      : '21:00',
+  )
   const [stops, setStops] = useState<StopDraft[]>(
     initial && initial.stops.length > 0
-      ? initial.stops.map((s) => pointToDraft(s))
+      ? initial.stops.map((s) => ({
+          name: s.name,
+          lat: String(s.lat),
+          lng: String(s.lng),
+          radius: String(s.radiusMeters ?? 100),
+        }))
       : [emptyStop()],
   )
   const [saving, setSaving] = useState(false)
 
-  const updateStart = (patch: Partial<StopDraft>) =>
-    setStart((prev) => ({ ...prev, ...patch }))
-
-  const updateStop = (index: number, patch: Partial<StopDraft>) => {
+  const updateStop = (index: number, patch: Partial<StopDraft>) =>
     setStops((prev) =>
       prev.map((s, i) => (i === index ? { ...s, ...patch } : s)),
     )
-  }
   const addStop = () => setStops((prev) => [...prev, emptyStop()])
   const removeStop = (index: number) =>
     setStops((prev) => prev.filter((_, i) => i !== index))
@@ -85,63 +93,53 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
       toast.error('Route name and vehicle number are required')
       return
     }
-
-    const startLat = Number(start.lat)
-    const startLng = Number(start.lng)
-    if (
-      !start.name.trim() ||
-      !start.time ||
-      Number.isNaN(startLat) ||
-      Number.isNaN(startLng)
-    ) {
-      toast.error('Start point needs a name, departure time, and valid lat/lng')
+    if (!activeStart || !activeEnd) {
+      toast.error('Set the active-hours window')
       return
     }
-    const parsedStart: Point = {
-      name: start.name.trim(),
-      lat: startLat,
-      lng: startLng,
-      expectedMinutes: timeToMinutes(start.time),
-    }
 
-    const parsedStops: Array<Point> = []
+    const parsedStops: Array<{
+      name: string
+      lat: number
+      lng: number
+      radiusMeters: number
+    }> = []
     for (const s of stops) {
       const lat = Number(s.lat)
       const lng = Number(s.lng)
-      if (!s.name.trim() || !s.time || Number.isNaN(lat) || Number.isNaN(lng)) {
-        toast.error('Each drop point needs a name, time, and valid lat/lng')
+      const radius = Number(s.radius)
+      if (
+        !s.name.trim() ||
+        Number.isNaN(lat) ||
+        Number.isNaN(lng) ||
+        Number.isNaN(radius) ||
+        radius <= 0
+      ) {
+        toast.error('Each drop point needs a name, valid lat/lng, and radius')
         return
       }
-      parsedStops.push({
-        name: s.name.trim(),
-        lat,
-        lng,
-        expectedMinutes: timeToMinutes(s.time),
-      })
+      parsedStops.push({ name: s.name.trim(), lat, lng, radiusMeters: radius })
     }
     if (parsedStops.length === 0) {
       toast.error('Add at least one drop point')
       return
     }
 
+    const payload = {
+      name,
+      vehicleRegistration: vehicle,
+      activeStartMinutes: timeToMinutes(activeStart),
+      activeEndMinutes: timeToMinutes(activeEnd),
+      stops: parsedStops,
+    }
+
     setSaving(true)
     try {
       if (initial) {
-        await update({
-          id: initial.id,
-          name,
-          vehicleRegistration: vehicle,
-          start: parsedStart,
-          stops: parsedStops,
-        })
+        await update({ id: initial.id, ...payload })
         toast.success('Route updated')
       } else {
-        await create({
-          name,
-          vehicleRegistration: vehicle,
-          start: parsedStart,
-          stops: parsedStops,
-        })
+        await create(payload)
         toast.success('Route created')
       }
       await navigate({ to: '/routes' })
@@ -166,7 +164,7 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Morning delivery loop"
+              placeholder="Evening delivery loop"
             />
           </div>
           <div className="grid gap-2">
@@ -175,53 +173,32 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
               id="vehicle"
               value={vehicle}
               onChange={(e) => setVehicle(e.target.value)}
-              placeholder="MH12AB1234"
+              placeholder="DL51GD8989"
             />
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Start point</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
-            <div className="grid gap-1">
-              <Label className="text-xs">Start / parking name</Label>
-              <Input
-                value={start.name}
-                onChange={(e) => updateStart({ name: e.target.value })}
-                placeholder="Depot / Parking"
-              />
-            </div>
-            <div className="grid gap-1">
-              <Label className="text-xs">Latitude</Label>
-              <Input
-                value={start.lat}
-                onChange={(e) => updateStart({ lat: e.target.value })}
-                placeholder="19.0760"
-                inputMode="decimal"
-              />
-            </div>
-            <div className="grid gap-1">
-              <Label className="text-xs">Longitude</Label>
-              <Input
-                value={start.lng}
-                onChange={(e) => updateStart({ lng: e.target.value })}
-                placeholder="72.8777"
-                inputMode="decimal"
-              />
-            </div>
-            <div className="grid gap-1">
-              <Label className="text-xs">Departure time</Label>
-              <Input
-                type="time"
-                value={start.time}
-                onChange={(e) => updateStart({ time: e.target.value })}
-              />
-            </div>
+          <div className="grid gap-2">
+            <Label htmlFor="active-start">Active from</Label>
+            <Input
+              id="active-start"
+              type="time"
+              value={activeStart}
+              onChange={(e) => setActiveStart(e.target.value)}
+            />
           </div>
+          <div className="grid gap-2">
+            <Label htmlFor="active-end">Active until</Label>
+            <Input
+              id="active-end"
+              type="time"
+              value={activeEnd}
+              onChange={(e) => setActiveEnd(e.target.value)}
+            />
+          </div>
+          <p className="text-muted-foreground text-xs sm:col-span-2">
+            The vehicle is monitored only during these hours. Use one route per
+            round (e.g. 5–9 PM and 2–5 AM as two routes) so distance driven
+            between rounds isn't counted.
+          </p>
         </CardContent>
       </Card>
 
@@ -233,10 +210,6 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-muted-foreground text-xs">
-            The operational day runs 5 PM–7 AM. Times from 5 PM onward are this
-            evening; times before 5 PM count as the next morning.
-          </p>
           {stops.map((stop, index) => (
             <div
               key={index}
@@ -255,7 +228,7 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
                 <Input
                   value={stop.lat}
                   onChange={(e) => updateStop(index, { lat: e.target.value })}
-                  placeholder="19.0760"
+                  placeholder="28.5355"
                   inputMode="decimal"
                 />
               </div>
@@ -264,16 +237,20 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
                 <Input
                   value={stop.lng}
                   onChange={(e) => updateStop(index, { lng: e.target.value })}
-                  placeholder="72.8777"
+                  placeholder="77.3910"
                   inputMode="decimal"
                 />
               </div>
               <div className="grid gap-1">
-                <Label className="text-xs">Expected time</Label>
+                <Label className="text-xs">Radius (m)</Label>
                 <Input
-                  type="time"
-                  value={stop.time}
-                  onChange={(e) => updateStop(index, { time: e.target.value })}
+                  value={stop.radius}
+                  onChange={(e) =>
+                    updateStop(index, { radius: e.target.value })
+                  }
+                  placeholder="100"
+                  inputMode="numeric"
+                  className="w-24"
                 />
               </div>
               <Button

@@ -17,30 +17,67 @@ export default defineSchema({
     userId: v.id('users'),
   }).index('userId', ['userId']),
 
-  // A route configured once by the user. Reused to generate a daily route each day.
+  // A route configured once by the user. The vehicle is monitored continuously
+  // during the active-hours window; every geofence entry becomes a visit.
   routes: defineTable({
     userId: v.id('users'),
     name: v.string(),
     vehicleRegistration: v.string(),
     isActive: v.boolean(),
-    // Start/origin point (parking/depot) where the vehicle begins the day.
-    // Optional so routes created before this feature still validate.
+    // Active-hours window (minutes from midnight, IST) — when to monitor the
+    // vehicle. e.g. 17:00 -> 1020. Optional for routes created before this.
+    activeStartMinutes: v.optional(v.number()),
+    activeEndMinutes: v.optional(v.number()),
+    // --- legacy fields (no longer used by the visit-tracking model) ---
     startName: v.optional(v.string()),
     startLat: v.optional(v.number()),
     startLng: v.optional(v.number()),
-    startExpectedMinutes: v.optional(v.number()), // departure time, minutes from midnight (IST)
+    startExpectedMinutes: v.optional(v.number()),
   }).index('by_user', ['userId']),
 
-  // Ordered drop points belonging to a configured route.
+  // Drop points (geofences) belonging to a route.
   routeStops: defineTable({
     routeId: v.id('routes'),
     order: v.number(),
     name: v.string(),
     lat: v.number(),
     lng: v.number(),
-    // Minutes from midnight (IST), e.g. 17:00 -> 1020.
-    expectedMinutes: v.number(),
+    // Geofence radius in metres (default 100 when unset).
+    radiusMeters: v.optional(v.number()),
+    // legacy — was the scheduled expected time; unused by visit tracking.
+    expectedMinutes: v.optional(v.number()),
   }).index('by_route', ['routeId']),
+
+  // One row per geofence entry: the vehicle visited this drop point.
+  visits: defineTable({
+    userId: v.id('users'),
+    routeId: v.id('routes'),
+    routeStopId: v.id('routeStops'),
+    vehicleRegistration: v.string(),
+    date: v.string(), // operational "YYYY-MM-DD" (IST) the visit belongs to
+    odometer: v.optional(v.number()),
+    lat: v.number(),
+    lng: v.number(),
+    distanceMeters: v.number(),
+    enteredAt: v.number(),
+    exitedAt: v.optional(v.number()),
+    dwellSeconds: v.optional(v.number()),
+  })
+    .index('by_route_date', ['routeId', 'date'])
+    .index('by_user_date', ['userId', 'date'])
+    .index('by_stop_date', ['routeStopId', 'date']),
+
+  // Inside/outside tracking per drop point so the monitor can detect the
+  // outside->inside transition that starts a new visit. Reset each day.
+  monitorState: defineTable({
+    routeId: v.id('routes'),
+    routeStopId: v.id('routeStops'),
+    date: v.string(),
+    insideNow: v.boolean(),
+    openVisitId: v.optional(v.id('visits')),
+    lastEntryAt: v.optional(v.number()),
+    lastDistanceMeters: v.optional(v.number()),
+  }).index('by_stop', ['routeStopId']),
 
   // One materialized execution of a route for a given day.
   dailyRoutes: defineTable({

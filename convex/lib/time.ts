@@ -58,3 +58,27 @@ export function expectedAtMs(dateStr: string, minutes: number): number {
 }
 
 export const POLL_WINDOW_MS = 30 * MS_PER_MIN
+
+// Absolute [startAt, endAt] of a route's active-hours window for the operational
+// day containing `nowMs`. Reuses expectedAtMs so morning hours (e.g. 2 AM) land
+// on the correct calendar day within the 5 PM–7 AM operational span.
+export function activeWindowMs(
+  nowMs: number,
+  startMinutes: number,
+  endMinutes: number,
+): { startAt: number; endAt: number } {
+  const date = operationalDateString(nowMs)
+  return {
+    startAt: expectedAtMs(date, startMinutes),
+    endAt: expectedAtMs(date, endMinutes),
+  }
+}
+
+export function isWithinActiveWindow(
+  nowMs: number,
+  startMinutes: number,
+  endMinutes: number,
+): boolean {
+  const { startAt, endAt } = activeWindowMs(nowMs, startMinutes, endMinutes)
+  return nowMs >= startAt && nowMs <= endAt
+}

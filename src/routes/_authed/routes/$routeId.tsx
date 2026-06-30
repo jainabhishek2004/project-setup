@@ -36,22 +36,13 @@ function EditRoute() {
           id: route._id,
           name: route.name,
           vehicleRegistration: route.vehicleRegistration,
-          start:
-            route.startLat != null &&
-            route.startLng != null &&
-            route.startExpectedMinutes != null
-              ? {
-                  name: route.startName ?? 'Start',
-                  lat: route.startLat,
-                  lng: route.startLng,
-                  expectedMinutes: route.startExpectedMinutes,
-                }
-              : null,
+          activeStartMinutes: route.activeStartMinutes,
+          activeEndMinutes: route.activeEndMinutes,
           stops: route.stops.map((s) => ({
             name: s.name,
             lat: s.lat,
             lng: s.lng,
-            expectedMinutes: s.expectedMinutes,
+            radiusMeters: s.radiusMeters,
           })),
         }}
       />

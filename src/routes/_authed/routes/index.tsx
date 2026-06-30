@@ -76,6 +76,14 @@ function RoutesList() {
                   <CardDescription>
                     Vehicle {route.vehicleRegistration} · {route.stops.length}{' '}
                     drop point(s)
+                    {route.activeStartMinutes != null &&
+                      route.activeEndMinutes != null && (
+                        <>
+                          {' '}
+                          · {minutesToLabel(route.activeStartMinutes)}–
+                          {minutesToLabel(route.activeEndMinutes)}
+                        </>
+                      )}
                   </CardDescription>
                 </div>
                 <div className="flex gap-1">
@@ -108,7 +116,7 @@ function RoutesList() {
                       <span>
                         {stop.order + 1}. {stop.name}
                       </span>
-                      <span>{minutesToLabel(stop.expectedMinutes)}</span>
+                      <span>{stop.radiusMeters ?? 100} m</span>
                     </li>
                   ))}
                 </ul>

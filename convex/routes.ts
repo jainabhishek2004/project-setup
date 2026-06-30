@@ -7,18 +7,10 @@ const stopInput = v.object({
   name: v.string(),
   lat: v.number(),
   lng: v.number(),
-  expectedMinutes: v.number(),
+  radiusMeters: v.number(),
 })
 
-// The route's start/origin point (parking/depot) + departure time.
-const startInput = v.object({
-  name: v.string(),
-  lat: v.number(),
-  lng: v.number(),
-  expectedMinutes: v.number(),
-})
-
-// All configured routes for the current user, each with its ordered stops.
+// All configured routes for the current user, each with its drop points.
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -42,7 +34,7 @@ export const list = query({
   },
 })
 
-// A single route + stops, scoped to the current user.
+// A single route + drop points, scoped to the current user.
 export const get = query({
   args: { id: v.id('routes') },
   handler: async (ctx, args) => {
@@ -64,7 +56,8 @@ export const create = mutation({
   args: {
     name: v.string(),
     vehicleRegistration: v.string(),
-    start: startInput,
+    activeStartMinutes: v.number(),
+    activeEndMinutes: v.number(),
     stops: v.array(stopInput),
   },
   handler: async (ctx, args) => {
@@ -74,10 +67,8 @@ export const create = mutation({
       name: args.name.trim(),
       vehicleRegistration: args.vehicleRegistration.trim(),
       isActive: true,
-      startName: args.start.name.trim(),
-      startLat: args.start.lat,
-      startLng: args.start.lng,
-      startExpectedMinutes: args.start.expectedMinutes,
+      activeStartMinutes: args.activeStartMinutes,
+      activeEndMinutes: args.activeEndMinutes,
     })
     await insertStops(ctx, routeId, args.stops)
     return routeId
@@ -89,7 +80,8 @@ export const update = mutation({
     id: v.id('routes'),
     name: v.string(),
     vehicleRegistration: v.string(),
-    start: startInput,
+    activeStartMinutes: v.number(),
+    activeEndMinutes: v.number(),
     stops: v.array(stopInput),
   },
   handler: async (ctx, args) => {
@@ -101,12 +93,10 @@ export const update = mutation({
     await ctx.db.patch(args.id, {
       name: args.name.trim(),
       vehicleRegistration: args.vehicleRegistration.trim(),
-      startName: args.start.name.trim(),
-      startLat: args.start.lat,
-      startLng: args.start.lng,
-      startExpectedMinutes: args.start.expectedMinutes,
+      activeStartMinutes: args.activeStartMinutes,
+      activeEndMinutes: args.activeEndMinutes,
     })
-    // Replace stops wholesale — simplest correct approach for an edit form.
+    // Replace drop points wholesale — simplest correct approach for an edit.
     await deleteStops(ctx, args.id)
     await insertStops(ctx, args.id, args.stops)
   },
@@ -144,7 +134,7 @@ async function insertStops(
     name: string
     lat: number
     lng: number
-    expectedMinutes: number
+    radiusMeters: number
   }>,
 ) {
   await Promise.all(
@@ -155,7 +145,7 @@ async function insertStops(
         name: stop.name.trim(),
         lat: stop.lat,
         lng: stop.lng,
-        expectedMinutes: stop.expectedMinutes,
+        radiusMeters: stop.radiusMeters,
       }),
     ),
   )

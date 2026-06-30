@@ -3,16 +3,9 @@ import { internal } from './_generated/api'
 
 const crons = cronJobs()
 
-// The operational day starts at 5 PM IST, so generate that day's routes right
-// as the window opens. 5 PM IST = 11:30 UTC.
-crons.daily(
-  'generate-daily-routes',
-  { hourUTC: 11, minuteUTC: 30 },
-  internal.generation.generateDaily,
-)
-
-// Poll the IoT API every 2 minutes for vehicles with an open drop-point window.
-// The 2-minute cadence stays under the IoT 1 req/min/vehicle rate limit.
-crons.interval('poll-vehicles', { minutes: 2 }, internal.polling.tick)
+// Continuously monitor vehicles whose route active-hours window is open, and
+// log a visit on each drop-point geofence entry. 2-min cadence stays under the
+// IoT 1 req/min/vehicle rate limit.
+crons.interval('monitor-vehicles', { minutes: 2 }, internal.monitoring.tick)
 
 export default crons
