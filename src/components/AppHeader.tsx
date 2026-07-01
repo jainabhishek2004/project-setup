@@ -35,6 +35,9 @@ export function AppHeader() {
           <Link to="/routes">Routes</Link>
         </Button>
         <Button variant="ghost" size="sm" asChild>
+          <Link to="/invoice">Invoice</Link>
+        </Button>
+        <Button variant="ghost" size="sm" asChild>
           <Link to="/settings">
             <Settings size={16} className="mr-1" />
             Settings

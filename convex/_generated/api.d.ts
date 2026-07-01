@@ -17,6 +17,7 @@ import type * as emails_resetPassword from "../emails/resetPassword.js";
 import type * as emails_verifyEmail from "../emails/verifyEmail.js";
 import type * as emails_verifyOTP from "../emails/verifyOTP.js";
 import type * as http from "../http.js";
+import type * as invoices from "../invoices.js";
 import type * as lib_geo from "../lib/geo.js";
 import type * as lib_iot from "../lib/iot.js";
 import type * as lib_osrm from "../lib/osrm.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "emails/verifyEmail": typeof emails_verifyEmail;
   "emails/verifyOTP": typeof emails_verifyOTP;
   http: typeof http;
+  invoices: typeof invoices;
   "lib/geo": typeof lib_geo;
   "lib/iot": typeof lib_iot;
   "lib/osrm": typeof lib_osrm;

@@ -15,6 +15,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedSettingsRouteImport } from './routes/_authed/settings'
+import { Route as AuthedInvoiceRouteImport } from './routes/_authed/invoice'
 import { Route as AuthedRoutesIndexRouteImport } from './routes/_authed/routes/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthedRoutesNewRouteImport } from './routes/_authed/routes/new'
@@ -50,6 +51,11 @@ const AuthedSettingsRoute = AuthedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedInvoiceRoute = AuthedInvoiceRouteImport.update({
+  id: '/invoice',
+  path: '/invoice',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedRoutesIndexRoute = AuthedRoutesIndexRouteImport.update({
   id: '/routes/',
   path: '/routes/',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/invoice': typeof AuthedInvoiceRoute
   '/settings': typeof AuthedSettingsRoute
   '/daily/$routeId': typeof AuthedDailyRouteIdRoute
   '/routes/$routeId': typeof AuthedRoutesRouteIdRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/invoice': typeof AuthedInvoiceRoute
   '/settings': typeof AuthedSettingsRoute
   '/': typeof AuthedIndexRoute
   '/daily/$routeId': typeof AuthedDailyRouteIdRoute
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/_authed/invoice': typeof AuthedInvoiceRoute
   '/_authed/settings': typeof AuthedSettingsRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/daily/$routeId': typeof AuthedDailyRouteIdRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/invoice'
     | '/settings'
     | '/daily/$routeId'
     | '/routes/$routeId'
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/invoice'
     | '/settings'
     | '/'
     | '/daily/$routeId'
@@ -145,6 +156,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/_authed/invoice'
     | '/_authed/settings'
     | '/_authed/'
     | '/_authed/daily/$routeId'
@@ -206,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSettingsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/invoice': {
+      id: '/_authed/invoice'
+      path: '/invoice'
+      fullPath: '/invoice'
+      preLoaderRoute: typeof AuthedInvoiceRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/routes/': {
       id: '/_authed/routes/'
       path: '/routes'
@@ -245,6 +264,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedRouteChildren {
+  AuthedInvoiceRoute: typeof AuthedInvoiceRoute
   AuthedSettingsRoute: typeof AuthedSettingsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedDailyRouteIdRoute: typeof AuthedDailyRouteIdRoute
@@ -254,6 +274,7 @@ interface AuthedRouteChildren {
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedInvoiceRoute: AuthedInvoiceRoute,
   AuthedSettingsRoute: AuthedSettingsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedDailyRouteIdRoute: AuthedDailyRouteIdRoute,
