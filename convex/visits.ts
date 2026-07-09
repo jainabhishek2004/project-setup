@@ -41,16 +41,43 @@ export const dashboard = query({
           byStop.set(key, arr)
         }
 
+        // Per-day vehicle override (breakdown substitute / third-party vendor).
+        const override = await ctx.db
+          .query('routeDayOverrides')
+          .withIndex('by_route_date', (q) =>
+            q.eq('routeId', route._id).eq('date', date),
+          )
+          .first()
+
         const odometers = visits
           .map((v) => v.odometer)
           .filter((o): o is number => o != null)
-        const billableKm =
+        const autoKm =
           odometers.length >= 2
             ? Math.max(0, Math.max(...odometers) - Math.min(...odometers))
             : null
 
+        // Non-trackable (vendor) days have no odometer visits → use manual km.
+        const billableKm =
+          override && !override.trackable ? (override.manualKm ?? null) : autoKm
+
         return {
           ...route,
+          // The vehicle that actually ran this day.
+          effectiveVehicle:
+            override?.vehicleRegistration ?? route.vehicleRegistration,
+          override: override
+            ? {
+                vehicleRegistration: override.vehicleRegistration,
+                source: override.source,
+                trackable: override.trackable,
+                vendorName: override.vendorName,
+                vendorCost: override.vendorCost,
+                manualKm: override.manualKm,
+                reason: override.reason,
+                notes: override.notes,
+              }
+            : null,
           stops: stops.map((s) => ({
             ...s,
             visits: byStop.get(s._id as string) ?? [],

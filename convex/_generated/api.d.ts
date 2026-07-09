@@ -23,6 +23,7 @@ import type * as lib_iot from "../lib/iot.js";
 import type * as lib_osrm from "../lib/osrm.js";
 import type * as lib_time from "../lib/time.js";
 import type * as monitoring from "../monitoring.js";
+import type * as overrides from "../overrides.js";
 import type * as routes from "../routes.js";
 import type * as routing from "../routing.js";
 import type * as todos from "../todos.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   "lib/osrm": typeof lib_osrm;
   "lib/time": typeof lib_time;
   monitoring: typeof monitoring;
+  overrides: typeof overrides;
   routes: typeof routes;
   routing: typeof routing;
   todos: typeof todos;

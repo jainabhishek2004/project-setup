@@ -79,6 +79,27 @@ export default defineSchema({
     lastDistanceMeters: v.optional(v.number()),
   }).index('by_stop', ['routeStopId']),
 
+  // Per-day vehicle override: which vehicle actually ran a route on a given day
+  // (breakdown substitute or a third-party/Porter vehicle). Whole-day model.
+  routeDayOverrides: defineTable({
+    routeId: v.id('routes'),
+    userId: v.id('users'),
+    date: v.string(), // operational "YYYY-MM-DD" (IST)
+    vehicleRegistration: v.string(), // the actual vehicle that ran
+    source: v.union(
+      v.literal('own_substitute'), // another own vehicle (has IoT → auto capture)
+      v.literal('third_party'), // vendor e.g. Porter (no IoT → manual)
+    ),
+    trackable: v.boolean(), // true = poll IoT; false = manual
+    vendorName: v.optional(v.string()),
+    vendorCost: v.optional(v.number()), // what we paid the vendor that day
+    manualKm: v.optional(v.number()), // km entered manually for non-trackable days
+    reason: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  })
+    .index('by_route_date', ['routeId', 'date'])
+    .index('by_user_date', ['userId', 'date']),
+
   // One materialized execution of a route for a given day.
   dailyRoutes: defineTable({
     routeId: v.id('routes'),

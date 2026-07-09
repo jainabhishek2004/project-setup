@@ -15,6 +15,7 @@ import type { FunctionReturnType } from 'convex/server'
 import { api } from '~/convex/_generated/api'
 import { operationalDateString } from '@/lib/date'
 import { AppHeader } from '@/components/AppHeader'
+import { RouteDayOverrideDialog } from '@/components/RouteDayOverrideDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -120,7 +121,11 @@ function Dashboard() {
       ) : (
         <div className="space-y-6">
           {routes.map((route) => (
-            <RouteVisitsCard key={route._id} route={route} />
+            <RouteVisitsCard
+              key={route._id}
+              route={route}
+              date={selectedDate}
+            />
           ))}
         </div>
       )}
@@ -134,7 +139,13 @@ type DashboardRoute = FunctionReturnType<
   typeof api.visits.dashboard
 >['routes'][number]
 
-function RouteVisitsCard({ route }: { route: DashboardRoute }) {
+function RouteVisitsCard({
+  route,
+  date,
+}: {
+  route: DashboardRoute
+  date: string
+}) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -142,9 +153,19 @@ function RouteVisitsCard({ route }: { route: DashboardRoute }) {
           <CardTitle className="flex items-center gap-2">
             {route.name}
             {!route.isActive && <Badge variant="secondary">inactive</Badge>}
+            {route.override && (
+              <Badge
+                variant={route.override.trackable ? 'outline' : 'destructive'}
+              >
+                {route.override.trackable
+                  ? 'substitute'
+                  : (route.override.vendorName ?? 'vendor')}
+              </Badge>
+            )}
           </CardTitle>
           <CardDescription>
-            Vehicle {route.vehicleRegistration}
+            Vehicle {route.effectiveVehicle}
+            {route.override && <> (default {route.vehicleRegistration})</>}
             {route.activeStartMinutes != null &&
               route.activeEndMinutes != null && (
                 <>
@@ -154,6 +175,9 @@ function RouteVisitsCard({ route }: { route: DashboardRoute }) {
                 </>
               )}{' '}
             · {route.totalVisits} visit(s)
+            {route.override?.vendorCost != null && (
+              <> · vendor cost ₹{route.override.vendorCost.toLocaleString()}</>
+            )}
           </CardDescription>
         </div>
         <div className="flex items-center gap-3">
@@ -162,6 +186,12 @@ function RouteVisitsCard({ route }: { route: DashboardRoute }) {
               <Gauge size={14} /> {route.billableKm.toLocaleString()} km
             </span>
           )}
+          <RouteDayOverrideDialog
+            routeId={route._id}
+            date={date}
+            defaultVehicle={route.vehicleRegistration}
+            override={route.override}
+          />
           <Button variant="outline" size="sm" asChild>
             <Link to="/daily/$routeId" params={{ routeId: route._id }}>
               <MapIcon className="size-4" /> Map

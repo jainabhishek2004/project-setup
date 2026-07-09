@@ -19,6 +19,7 @@ export const tick = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now()
+    const date = operationalDateString(now)
     const routes = await ctx.db.query('routes').collect()
 
     const vehicles = new Set<string>()
@@ -33,7 +34,8 @@ export const tick = internalMutation({
           route.activeEndMinutes,
         )
       ) {
-        vehicles.add(route.vehicleRegistration)
+        const eff = await effectiveVehicle(ctx, route, date)
+        if (eff) vehicles.add(eff)
       }
     }
 
@@ -79,16 +81,19 @@ export const evaluateEntries = internalMutation({
     const now = Date.now()
     const date = operationalDateString(now)
 
-    const routes = (await ctx.db.query('routes').collect()).filter(
+    const candidateRoutes = (await ctx.db.query('routes').collect()).filter(
       (r) =>
         r.isActive &&
-        r.vehicleRegistration === args.vehicleRegistration &&
         r.activeStartMinutes != null &&
         r.activeEndMinutes != null &&
         isWithinActiveWindow(now, r.activeStartMinutes, r.activeEndMinutes),
     )
 
-    for (const route of routes) {
+    for (const route of candidateRoutes) {
+      // Only process routes whose effective vehicle today is the one we polled.
+      const eff = await effectiveVehicle(ctx, route, date)
+      if (eff !== args.vehicleRegistration) continue
+
       const stops = await ctx.db
         .query('routeStops')
         .withIndex('by_route', (q) => q.eq('routeId', route._id))
@@ -105,7 +110,7 @@ export const evaluateEntries = internalMutation({
             userId: route.userId,
             routeId: route._id,
             routeStopId: stop._id,
-            vehicleRegistration: route.vehicleRegistration,
+            vehicleRegistration: args.vehicleRegistration, // the vehicle actually polled
             date,
             odometer: args.odometer,
             lat: args.lat,
@@ -145,6 +150,25 @@ export const evaluateEntries = internalMutation({
     }
   },
 })
+
+// Which vehicle should be polled for a route on `date`: the per-day override if
+// it's trackable; null if the override is a non-trackable vendor (skip polling);
+// otherwise the route's default vehicle.
+async function effectiveVehicle(
+  ctx: MutationCtx,
+  route: Doc<'routes'>,
+  date: string,
+): Promise<string | null> {
+  const ov = await ctx.db
+    .query('routeDayOverrides')
+    .withIndex('by_route_date', (q) =>
+      q.eq('routeId', route._id).eq('date', date),
+    )
+    .first()
+  if (!ov) return route.vehicleRegistration
+  if (!ov.trackable) return null
+  return ov.vehicleRegistration
+}
 
 // One monitorState row per drop point; reset its transition state on a new day.
 async function getOrInitState(

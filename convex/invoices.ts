@@ -27,7 +27,12 @@ export const getInvoicePdf = action({
     }
     const res = await fetch(
       `https://app.getswipe.in/api/partner/v2/doc/pdf/${encodeURIComponent(args.hashId)}`,
-      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/pdf' } },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/pdf',
+        },
+      },
     )
     if (!res.ok) {
       const text = await res.text().catch(() => '')
@@ -124,7 +129,6 @@ export const createInvoice = action({
         email: args.customer.email ?? '',
         gstin: args.customer.gstin ?? '',
         billing_address: address,
-        shipping_address: address,
       },
       items,
     }
