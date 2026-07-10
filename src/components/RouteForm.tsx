@@ -9,6 +9,7 @@ import { Id } from '~/convex/_generated/dataModel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type StopDraft = {
@@ -16,6 +17,7 @@ type StopDraft = {
   lat: string
   lng: string
   radius: string
+  optional: boolean
 }
 
 const emptyStop = (): StopDraft => ({
@@ -23,6 +25,7 @@ const emptyStop = (): StopDraft => ({
   lat: '',
   lng: '',
   radius: '100',
+  optional: false,
 })
 
 function minutesToTime(minutes: number): string {
@@ -47,6 +50,7 @@ export type RouteFormInitial = {
     lat: number
     lng: number
     radiusMeters?: number
+    optional?: boolean
   }>
 }
 
@@ -74,6 +78,7 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
           lat: String(s.lat),
           lng: String(s.lng),
           radius: String(s.radiusMeters ?? 100),
+          optional: s.optional ?? false,
         }))
       : [emptyStop()],
   )
@@ -103,6 +108,7 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
       lat: number
       lng: number
       radiusMeters: number
+      optional: boolean
     }> = []
     for (const s of stops) {
       const lat = Number(s.lat)
@@ -118,7 +124,13 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
         toast.error('Each drop point needs a name, valid lat/lng, and radius')
         return
       }
-      parsedStops.push({ name: s.name.trim(), lat, lng, radiusMeters: radius })
+      parsedStops.push({
+        name: s.name.trim(),
+        lat,
+        lng,
+        radiusMeters: radius,
+        optional: s.optional,
+      })
     }
     if (parsedStops.length === 0) {
       toast.error('Add at least one drop point')
@@ -210,10 +222,14 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-muted-foreground text-xs">
+            Mark a hub <b>Optional</b> if the vehicle only visits it ad-hoc.
+            Only non-optional (planned) hubs form the regular optimized route.
+          </p>
           {stops.map((stop, index) => (
             <div
               key={index}
-              className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_auto_auto] sm:items-end"
+              className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_auto_auto_auto] sm:items-end"
             >
               <div className="grid gap-1">
                 <Label className="text-xs">Location name</Label>
@@ -253,6 +269,15 @@ export function RouteForm({ initial }: { initial?: RouteFormInitial }) {
                   className="w-24"
                 />
               </div>
+              <label className="flex items-center gap-1.5 pb-2 text-xs whitespace-nowrap">
+                <Checkbox
+                  checked={stop.optional}
+                  onCheckedChange={(c) =>
+                    updateStop(index, { optional: c === true })
+                  }
+                />
+                Optional
+              </label>
               <Button
                 type="button"
                 variant="ghost"

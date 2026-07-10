@@ -2,10 +2,82 @@ import { v } from 'convex/values'
 import { action } from './_generated/server'
 import { api } from './_generated/api'
 
-const SWIPE_URL = 'https://app.getswipe.in/api/partner/v2/doc'
+const SWIPE_BASE = 'https://app.getswipe.in/api/partner'
+const SWIPE_URL = `${SWIPE_BASE}/v2/doc`
 const SAC_LOGISTICS = '998711'
 
 const round2 = (n: number) => Math.round(n * 100) / 100
+
+// Swipe's create-doc party.id is an EXTERNAL customer_id. Customers created in
+// the Swipe UI have no external id (only an internal swipe_id), so we can't
+// reference them directly. This resolves a stable external id (the GSTIN): if a
+// matching customer already exists, map GSTIN -> its swipe_id first so party.id
+// links to it; otherwise the GSTIN is used to create a new customer.
+async function resolvePartyId(
+  token: string,
+  customer: { name: string; gstin?: string },
+): Promise<string> {
+  const externalId =
+    (customer.gstin || customer.name)
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(0, 40) || 'customer'
+
+  // 1. Find the existing customer's internal swipe_id (by GSTIN, else name).
+  let swipeId: string | null = null
+  try {
+    const res = await fetch(`${SWIPE_BASE}/v2/customer/list`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    })
+    if (res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        data?: { customers?: Array<Record<string, unknown>> }
+      } | null
+      const customers = body?.data?.customers ?? []
+      const gstin = customer.gstin?.trim().toUpperCase()
+      const name = customer.name.trim().toLowerCase()
+      const match =
+        (gstin &&
+          customers.find(
+            (c) =>
+              String(c?.gstin ?? '')
+                .trim()
+                .toUpperCase() === gstin,
+          )) ||
+        customers.find(
+          (c) =>
+            String(c?.name ?? '')
+              .trim()
+              .toLowerCase() === name,
+        )
+      if (match?.swipe_id != null) swipeId = String(match.swipe_id)
+    }
+  } catch {
+    // best effort; fall through to create-new
+  }
+
+  // 2. If it exists, map our external id -> swipe_id so party.id resolves to it.
+  if (swipeId) {
+    try {
+      await fetch(`${SWIPE_BASE}/v2/customer/list`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          customer_mapping: [
+            { customer_id: externalId, swipe_id: swipeId, force_update: true },
+          ],
+        }),
+      })
+    } catch {
+      // best effort
+    }
+  }
+
+  return externalId
+}
 
 const addressInput = v.object({
   addressLine1: v.string(),
@@ -112,15 +184,16 @@ export const createInvoice = action({
       pincode: args.customer.billing.pincode,
     }
 
+    // Resolve a party id that links to the existing customer (mapping GSTIN ->
+    // swipe_id if needed) or creates a new one.
+    const partyId = await resolvePartyId(token, args.customer)
+
     const payload = {
       document_type: 'invoice',
       document_date: args.documentDate,
       notes: args.notes ?? '',
       party: {
-        id:
-          (args.customer.gstin || args.customer.name)
-            .replace(/[^A-Za-z0-9]/g, '')
-            .slice(0, 40) || 'customer',
+        id: partyId,
         type: 'customer',
         name: args.customer.name,
         company_name: args.customer.name,
@@ -155,7 +228,6 @@ export const createInvoice = action({
     } | null
 
     if (!res.ok || !body?.success) {
-      // Surface Swipe's detailed validation payload so the exact field is visible.
       throw new Error(
         `Swipe API error (${res.status}): ${body?.message ?? 'unknown error'} :: ${JSON.stringify(body ?? {})}`,
       )

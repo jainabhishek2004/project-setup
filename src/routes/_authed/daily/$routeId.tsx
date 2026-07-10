@@ -64,6 +64,7 @@ function MapPage() {
     return {
       name: s.name,
       order: s.order,
+      optional: s.optional,
       targetLat: s.lat,
       targetLng: s.lng,
       status,
@@ -75,6 +76,7 @@ function MapPage() {
     _id: s._id as string,
     name: s.name,
     order: s.order,
+    optional: s.optional,
     radiusMeters: s.radiusMeters,
     visits: (visitsByStop.get(s._id as string) ?? []).map((v) => ({
       _id: v._id as string,

@@ -2,7 +2,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Toaster, toast } from 'sonner'
 import { useAction } from 'convex/react'
-import { FileSpreadsheet, Loader2, ReceiptText, Upload } from 'lucide-react'
+import {
+  Download,
+  FileSpreadsheet,
+  Loader2,
+  ReceiptText,
+  Upload,
+} from 'lucide-react'
 
 import { api } from '~/convex/_generated/api'
 import { AppHeader } from '@/components/AppHeader'
@@ -159,6 +165,7 @@ const inr = (n: number) =>
 
 function InvoicePage() {
   const createInvoice = useAction(api.invoices.createInvoice)
+  const getInvoicePdf = useAction(api.invoices.getInvoicePdf)
 
   const [fileName, setFileName] = useState<string | null>(null)
   const [zones, setZones] = useState<Zone[]>([])
@@ -180,8 +187,10 @@ function InvoicePage() {
   const [custPin, setCustPin] = useState('122001')
 
   const [submitting, setSubmitting] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [result, setResult] = useState<{
     serialNumber: string | null
+    hashId: string | null
     total: number
   } | null>(null)
 
@@ -235,7 +244,11 @@ function InvoicePage() {
         },
         zones: zones.map((z) => ({ route: z.route, amount: z.amount })),
       })
-      setResult({ serialNumber: res.serialNumber, total: res.total })
+      setResult({
+        serialNumber: res.serialNumber,
+        hashId: res.hashId,
+        total: res.total,
+      })
       toast.success(`Invoice ${res.serialNumber ?? ''} created`)
     } catch (err) {
       console.error(err)
@@ -244,6 +257,28 @@ function InvoicePage() {
       )
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDownloadPdf = async () => {
+    if (!result?.hashId) return
+    setPdfLoading(true)
+    try {
+      const { url } = await getInvoicePdf({ hashId: result.hashId })
+      if (!url) {
+        toast.error('PDF not available yet')
+        return
+      }
+      const a = document.createElement('a')
+      a.href = url
+      a.target = '_blank'
+      a.rel = 'noreferrer'
+      a.click()
+    } catch (err) {
+      console.error(err)
+      toast.error('Could not fetch the PDF')
+    } finally {
+      setPdfLoading(false)
     }
   }
 
@@ -421,10 +456,26 @@ function InvoicePage() {
           Generate Swipe invoice
         </Button>
         {result && (
-          <span className="text-sm">
-            ✅ Created <b>{result.serialNumber ?? 'invoice'}</b> · total ₹
-            {inr(result.total)}
-          </span>
+          <>
+            <span className="text-sm">
+              ✅ Created <b>{result.serialNumber ?? 'invoice'}</b> · total ₹
+              {inr(result.total)}
+            </span>
+            {result.hashId && (
+              <Button
+                variant="outline"
+                onClick={handleDownloadPdf}
+                disabled={pdfLoading}
+              >
+                {pdfLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+                Download PDF
+              </Button>
+            )}
+          </>
         )}
       </div>
 

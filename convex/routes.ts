@@ -8,6 +8,7 @@ const stopInput = v.object({
   lat: v.number(),
   lng: v.number(),
   radiusMeters: v.number(),
+  optional: v.optional(v.boolean()),
 })
 
 // All configured routes for the current user, each with its drop points.
@@ -96,9 +97,37 @@ export const update = mutation({
       activeStartMinutes: args.activeStartMinutes,
       activeEndMinutes: args.activeEndMinutes,
     })
-    // Replace drop points wholesale — simplest correct approach for an edit.
-    await deleteStops(ctx, args.id)
-    await insertStops(ctx, args.id, args.stops)
+
+    // Reconcile drop points BY POSITION so existing hub ids are preserved. This
+    // keeps already-captured visits attached to their hub (a full delete +
+    // re-insert would give new ids and orphan those visits).
+    const existing = await ctx.db
+      .query('routeStops')
+      .withIndex('by_route', (q) => q.eq('routeId', args.id))
+      .collect()
+    existing.sort((a, b) => a.order - b.order)
+
+    for (let i = 0; i < args.stops.length; i++) {
+      const s = args.stops[i]
+      const fields = {
+        routeId: args.id,
+        order: i,
+        name: s.name.trim(),
+        lat: s.lat,
+        lng: s.lng,
+        radiusMeters: s.radiusMeters,
+        optional: s.optional ? true : undefined,
+      }
+      if (existing[i]) {
+        await ctx.db.patch(existing[i]._id, fields)
+      } else {
+        await ctx.db.insert('routeStops', fields)
+      }
+    }
+    // Delete any hubs removed by the edit.
+    for (let j = args.stops.length; j < existing.length; j++) {
+      await ctx.db.delete(existing[j]._id)
+    }
   },
 })
 
@@ -135,6 +164,7 @@ async function insertStops(
     lat: number
     lng: number
     radiusMeters: number
+    optional?: boolean
   }>,
 ) {
   await Promise.all(
@@ -146,6 +176,7 @@ async function insertStops(
         lat: stop.lat,
         lng: stop.lng,
         radiusMeters: stop.radiusMeters,
+        optional: stop.optional ? true : undefined,
       }),
     ),
   )

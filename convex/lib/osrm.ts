@@ -60,3 +60,42 @@ export async function fetchOptimizedTrip(
     durationSeconds: trip.duration,
   }
 }
+
+type OsrmRouteResponse = {
+  code: string
+  routes?: Array<{
+    distance: number
+    duration: number
+    geometry: { coordinates: Array<[number, number]>; type: 'LineString' }
+  }>
+}
+
+// Route through `coordinates` in the GIVEN order (no reordering) — the regular
+// route the vehicle follows. Returns the road-following driving path.
+export async function fetchRoute(
+  coordinates: Array<{ lat: number; lng: number }>,
+): Promise<OptimizedRoute | null> {
+  if (coordinates.length < 2) return null
+
+  const base = process.env.OSRM_BASE_URL ?? DEFAULT_OSRM_BASE_URL
+  const coordStr = coordinates.map((c) => `${c.lng},${c.lat}`).join(';')
+  const url = `${base}/route/v1/driving/${coordStr}?geometries=geojson&overview=full`
+
+  const res = await fetch(url, { headers: { Accept: 'application/json' } })
+  if (!res.ok) {
+    throw new Error(`OSRM error ${res.status}`)
+  }
+
+  const body = (await res.json()) as OsrmRouteResponse
+  const route = body.routes?.[0]
+  if (body.code !== 'Ok' || !route) {
+    return null
+  }
+
+  return {
+    geometry: route.geometry.coordinates,
+    order: coordinates.map((_, i) => i), // fixed input order
+    distanceMeters: route.distance,
+    durationSeconds: route.duration,
+  }
+}

@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation } from './_generated/server'
 import { getUser } from './auth'
+import { operationalDateString } from './lib/time'
 
 // Set (or update) the per-day vehicle override for a route. Whole-day model:
 // the override replaces the day, so we clear that route's visits for the date
@@ -54,37 +55,43 @@ export const set = mutation({
       await ctx.db.insert('routeDayOverrides', fields)
     }
 
-    // Whole-day override: discard the day's existing visits (they may be from the
-    // wrong/old vehicle) so km recomputes cleanly for the effective vehicle.
-    const visits = await ctx.db
-      .query('visits')
-      .withIndex('by_route_date', (q) =>
-        q.eq('routeId', args.routeId).eq('date', args.date),
-      )
-      .collect()
-    await Promise.all(visits.map((visit) => ctx.db.delete(visit._id)))
+    // Only touch live state when the override is for the CURRENT operational day.
+    // Pre-setting a future day must NOT disturb today's monitoring; a past day is
+    // historical (manual km). monitorState is a single live row per stop, so
+    // resetting it for a non-current date would corrupt today's polling.
+    if (args.date === operationalDateString(Date.now())) {
+      // Whole-day override: discard the day's existing visits (they may be from
+      // the wrong/old vehicle) so km recomputes cleanly for the effective vehicle.
+      const visits = await ctx.db
+        .query('visits')
+        .withIndex('by_route_date', (q) =>
+          q.eq('routeId', args.routeId).eq('date', args.date),
+        )
+        .collect()
+      await Promise.all(visits.map((visit) => ctx.db.delete(visit._id)))
 
-    // Re-arm the geofence state for this route's stops so the effective vehicle
-    // can log fresh entries.
-    const stops = await ctx.db
-      .query('routeStops')
-      .withIndex('by_route', (q) => q.eq('routeId', args.routeId))
-      .collect()
-    await Promise.all(
-      stops.map(async (stop) => {
-        const st = await ctx.db
-          .query('monitorState')
-          .withIndex('by_stop', (q) => q.eq('routeStopId', stop._id))
-          .first()
-        if (st) {
-          await ctx.db.patch(st._id, {
-            date: args.date,
-            insideNow: false,
-            openVisitId: undefined,
-          })
-        }
-      }),
-    )
+      // Re-arm the geofence state for this route's stops so the effective vehicle
+      // can log fresh entries.
+      const stops = await ctx.db
+        .query('routeStops')
+        .withIndex('by_route', (q) => q.eq('routeId', args.routeId))
+        .collect()
+      await Promise.all(
+        stops.map(async (stop) => {
+          const st = await ctx.db
+            .query('monitorState')
+            .withIndex('by_stop', (q) => q.eq('routeStopId', stop._id))
+            .first()
+          if (st) {
+            await ctx.db.patch(st._id, {
+              date: args.date,
+              insideNow: false,
+              openVisitId: undefined,
+            })
+          }
+        }),
+      )
+    }
   },
 })
 

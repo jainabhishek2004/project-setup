@@ -15,6 +15,7 @@ type Stop = {
   _id: string
   name: string
   order: number
+  optional?: boolean
   radiusMeters?: number
   visits: Visit[]
 }
@@ -51,6 +52,11 @@ export function RouteStopsTimeline({ stops }: { stops: Stop[] }) {
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-sm font-medium">
                   <MapPin size={13} /> {stop.name}
+                  {stop.optional && (
+                    <span className="text-muted-foreground text-[10px] font-normal">
+                      (optional)
+                    </span>
+                  )}
                 </span>
                 <Badge variant={visited ? 'default' : 'secondary'}>
                   {stop.visits.length} visit(s)

@@ -25,6 +25,7 @@ type Stop = {
   name: string
   order: number
   isStart?: boolean
+  optional?: boolean
   targetLat: number
   targetLng: number
   status: 'pending' | 'polling' | 'captured' | 'missed'
@@ -39,7 +40,7 @@ type VehiclePosition = {
   capturedAt: number
 }
 
-type Optimized = {
+type RouteResult = {
   geometry: Array<[number, number]>
   order: number[]
   distanceMeters: number
@@ -53,8 +54,7 @@ const stopColor: Record<Stop['status'], string> = {
   missed: 'bg-red-500',
 }
 
-const PLANNED_COLOR = '#6366f1' // indigo dashed = configured order
-const OPTIMIZED_COLOR = '#10b981' // emerald solid = OSRM optimized route
+const ROUTE_COLOR = '#10b981' // emerald solid = regular / suggested route
 
 function computeBounds(
   points: Array<[number, number]>,
@@ -86,13 +86,17 @@ export function RouteMap({
   mapClassName?: string
 }) {
   const getPosition = useAction(api.vehicles.getCurrentPosition)
+  const getPlanned = useAction(api.routing.getPlannedRoute)
   const getOptimized = useAction(api.routing.getOptimizedRoute)
 
   const [vehicle, setVehicle] = useState<VehiclePosition | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [optimized, setOptimized] = useState<Optimized | null>(null)
+  // false = regular route (planned hubs in configured order); true = suggested
+  // better order (OSRM TSP over the planned hubs).
+  const [optimize, setOptimize] = useState(false)
+  const [route, setRoute] = useState<RouteResult | null>(null)
   const [routeLoading, setRouteLoading] = useState(false)
   const [routeError, setRouteError] = useState<string | null>(null)
 
@@ -100,17 +104,23 @@ export function RouteMap({
     () => [...stops].sort((a, b) => a.order - b.order),
     [stops],
   )
+  // Planned (core) hubs form the regular route; optional hubs are ad-hoc.
+  const plannedStops = useMemo(
+    () => sorted.filter((s) => !s.optional),
+    [sorted],
+  )
+  const optionalStops = useMemo(
+    () => sorted.filter((s) => s.optional),
+    [sorted],
+  )
 
   const refresh = async () => {
     setLoading(true)
     setError(null)
     try {
       const reading = await getPosition({ vehicleRegistration })
-      if (reading) {
-        setVehicle(reading)
-      } else {
-        setError('No live location available for this vehicle')
-      }
+      if (reading) setVehicle(reading)
+      else setError('No live location available for this vehicle')
     } catch (err) {
       console.error(err)
       setError('Could not fetch vehicle location')
@@ -119,69 +129,44 @@ export function RouteMap({
     }
   }
 
-  // Fetch the vehicle's current position when the map opens.
   useEffect(() => {
     void refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleRegistration])
 
-  // Ordered routing inputs: the vehicle (if known) is the fixed start, then the
-  // configured drop points. Index in this array maps to OSRM's input index.
-  const routeInputs = useMemo(() => {
-    const inputs: Array<{
-      kind: 'vehicle' | 'stop'
-      stopIndex: number
-      lat: number
-      lng: number
-    }> = []
-    if (vehicle) {
-      inputs.push({
-        kind: 'vehicle',
-        stopIndex: -1,
-        lat: vehicle.lat,
-        lng: vehicle.lng,
-      })
-    }
-    sorted.forEach((s, idx) =>
-      inputs.push({
-        kind: 'stop',
-        stopIndex: idx,
-        lat: s.targetLat,
-        lng: s.targetLng,
-      }),
-    )
-    return inputs
-  }, [vehicle, sorted])
-
-  const inputsKey = useMemo(
+  const plannedCoords = useMemo(
+    () => plannedStops.map((s) => ({ lat: s.targetLat, lng: s.targetLng })),
+    [plannedStops],
+  )
+  const routeKey = useMemo(
     () =>
-      routeInputs
-        .map((p) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`)
+      `${optimize}|` +
+      plannedCoords
+        .map((c) => `${c.lat.toFixed(6)},${c.lng.toFixed(6)}`)
         .join(';'),
-    [routeInputs],
+    [optimize, plannedCoords],
   )
 
-  // Recompute the optimized route whenever the inputs change.
+  // Compute the route line over the planned hubs (fixed order, or TSP if optimize).
   useEffect(() => {
-    if (routeInputs.length < 2) {
-      setOptimized(null)
+    if (plannedCoords.length < 2) {
+      setRoute(null)
       return
     }
     let cancelled = false
     setRouteLoading(true)
     setRouteError(null)
-    getOptimized({
-      coordinates: routeInputs.map(({ lat, lng }) => ({ lat, lng })),
-    })
+    const fn = optimize ? getOptimized : getPlanned
+    fn({ coordinates: plannedCoords })
       .then((r) => {
         if (cancelled) return
-        if (r) setOptimized(r)
-        else setRouteError('No optimized route found')
+        if (r) setRoute(r)
+        else setRouteError('No route found')
       })
       .catch((err) => {
         if (cancelled) return
         console.error(err)
-        setRouteError('Could not compute optimized route')
+        setRouteError('Could not compute route')
       })
       .finally(() => {
         if (!cancelled) setRouteLoading(false)
@@ -190,32 +175,24 @@ export function RouteMap({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputsKey])
+  }, [routeKey])
 
-  const points = useMemo(
-    () => routeInputs.map((p) => [p.lng, p.lat] as [number, number]),
-    [routeInputs],
-  )
-  const bounds = useMemo(() => computeBounds(points), [points])
+  // The planned hubs in the route's visiting order (for the "Order: …" text).
+  const orderedStops = useMemo(() => {
+    if (!route) return plannedStops
+    return route.order.map((i) => plannedStops[i]).filter(Boolean)
+  }, [route, plannedStops])
+
+  const bounds = useMemo(() => {
+    const pts = sorted.map(
+      (s) => [s.targetLng, s.targetLat] as [number, number],
+    )
+    if (vehicle) pts.push([vehicle.lng, vehicle.lat])
+    return computeBounds(pts)
+  }, [sorted, vehicle])
   const center: [number, number] = bounds
     ? [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2]
-    : [77.209, 28.6139] // sensible India default
-
-  // Straight connector through the configured drop-point order (reference).
-  const plannedLine = useMemo(
-    () => sorted.map((s) => [s.targetLng, s.targetLat] as [number, number]),
-    [sorted],
-  )
-
-  // Drop points listed in the OSRM-optimized visiting order.
-  const optimizedStops = useMemo(() => {
-    if (!optimized) return []
-    return optimized.order
-      .map((i) => routeInputs[i])
-      .filter((p) => p && p.kind === 'stop')
-      .map((p) => sorted[p.stopIndex])
-      .filter(Boolean)
-  }, [optimized, routeInputs, sorted])
+    : [77.209, 28.6139]
 
   return (
     <div className="space-y-3">
@@ -247,45 +224,50 @@ export function RouteMap({
         </Button>
       </div>
 
-      {/* Optimized route summary + legend */}
+      {/* Route summary + legend */}
       <div className="bg-muted/40 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border px-3 py-2 text-xs">
         <span className="flex items-center gap-1.5 font-medium">
-          <RouteIcon className="size-3.5" /> Optimized route
+          <RouteIcon className="size-3.5" />
+          {optimize ? 'Suggested order' : 'Regular route'}
         </span>
         {routeLoading ? (
           <span className="text-muted-foreground flex items-center gap-1">
             <Loader2 className="size-3 animate-spin" /> computing…
           </span>
-        ) : optimized ? (
+        ) : route ? (
           <>
-            <span>{(optimized.distanceMeters / 1000).toFixed(1)} km</span>
-            <span>~{Math.round(optimized.durationSeconds / 60)} min</span>
-            {optimizedStops.length > 0 && (
+            <span>{(route.distanceMeters / 1000).toFixed(1)} km</span>
+            <span>~{Math.round(route.durationSeconds / 60)} min</span>
+            {orderedStops.length > 0 && (
               <span className="text-muted-foreground">
-                Order: {optimizedStops.map((s) => s.name).join(' → ')}
+                Order: {orderedStops.map((s) => s.name).join(' → ')}
               </span>
             )}
           </>
         ) : (
           <span className="text-muted-foreground">
-            {routeError ?? 'unavailable'}
+            {plannedStops.length < 2
+              ? 'need 2+ planned hubs'
+              : (routeError ?? 'unavailable')}
           </span>
         )}
         <span className="ml-auto flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <span
-              className="inline-block h-0.5 w-4"
-              style={{ backgroundColor: OPTIMIZED_COLOR }}
-            />
-            optimized
-          </span>
-          <span className="flex items-center gap-1">
-            <span
-              className="inline-block h-0.5 w-4 border-t border-dashed"
-              style={{ borderColor: PLANNED_COLOR }}
-            />
-            planned
-          </span>
+          {plannedStops.length >= 2 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs"
+              onClick={() => setOptimize((o) => !o)}
+            >
+              {optimize ? 'Show regular order' : 'Suggest better order'}
+            </Button>
+          )}
+          {optionalStops.length > 0 && (
+            <span className="text-muted-foreground flex items-center gap-1">
+              <span className="inline-block size-2 rounded-full border border-dashed border-neutral-400" />
+              optional hub
+            </span>
+          )}
         </span>
       </div>
 
@@ -300,27 +282,16 @@ export function RouteMap({
         >
           <MapControls showFullscreen />
 
-          {/* Planned (configured) order — straight dashed reference line. */}
-          {plannedLine.length >= 2 && (
+          {route && route.geometry.length >= 2 && (
             <MapRoute
-              coordinates={plannedLine}
-              color={PLANNED_COLOR}
-              width={2}
-              opacity={0.5}
-              dashArray={[2, 2]}
-            />
-          )}
-
-          {/* OSRM optimized route — solid road-following path. */}
-          {optimized && optimized.geometry.length >= 2 && (
-            <MapRoute
-              coordinates={optimized.geometry}
-              color={OPTIMIZED_COLOR}
+              coordinates={route.geometry}
+              color={ROUTE_COLOR}
               width={4}
             />
           )}
 
-          {sorted.map((stop) => (
+          {/* Planned (core) hubs — numbered, status-coloured. */}
+          {plannedStops.map((stop, i) => (
             <MapMarker
               key={stop.order}
               longitude={stop.targetLng}
@@ -333,24 +304,48 @@ export function RouteMap({
                     stop.isStart ? 'bg-indigo-600' : stopColor[stop.status],
                   )}
                 >
-                  {stop.isStart ? (
-                    <Home className="size-3.5" />
-                  ) : (
-                    stop.order + 1
-                  )}
+                  {stop.isStart ? <Home className="size-3.5" /> : i + 1}
                 </div>
               </MarkerContent>
-              <MarkerLabel>
-                {stop.isStart ? `${stop.name} (start)` : stop.name}
-              </MarkerLabel>
+              <MarkerLabel>{stop.name}</MarkerLabel>
               <MarkerPopup closeButton>
                 <div className="space-y-1 text-xs">
-                  <div className="text-sm font-medium">
-                    {stop.name}
-                    {stop.isStart && ' (start)'}
-                  </div>
+                  <div className="text-sm font-medium">{stop.name}</div>
                   <div className="text-muted-foreground capitalize">
-                    {stop.status}
+                    {stop.status === 'captured' ? 'visited' : 'not visited'}
+                  </div>
+                  {stop.odometer != null && (
+                    <div>Odometer: {stop.odometer.toLocaleString()} km</div>
+                  )}
+                </div>
+              </MarkerPopup>
+            </MapMarker>
+          ))}
+
+          {/* Optional (ad-hoc) hubs — faint; green when visited. */}
+          {optionalStops.map((stop) => (
+            <MapMarker
+              key={stop.order}
+              longitude={stop.targetLng}
+              latitude={stop.targetLat}
+            >
+              <MarkerContent>
+                <div
+                  className={cn(
+                    'flex size-4 items-center justify-center rounded-full border border-dashed border-white/70 shadow',
+                    stop.status === 'captured'
+                      ? 'bg-green-500'
+                      : 'bg-neutral-500/60',
+                  )}
+                />
+              </MarkerContent>
+              <MarkerLabel>{stop.name} · optional</MarkerLabel>
+              <MarkerPopup closeButton>
+                <div className="space-y-1 text-xs">
+                  <div className="text-sm font-medium">{stop.name}</div>
+                  <div className="text-muted-foreground">
+                    optional hub ·{' '}
+                    {stop.status === 'captured' ? 'visited' : 'not visited'}
                   </div>
                   {stop.odometer != null && (
                     <div>Odometer: {stop.odometer.toLocaleString()} km</div>

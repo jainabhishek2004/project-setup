@@ -19,8 +19,9 @@ import { Route as AuthedInvoiceRouteImport } from './routes/_authed/invoice'
 import { Route as AuthedRoutesIndexRouteImport } from './routes/_authed/routes/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthedRoutesNewRouteImport } from './routes/_authed/routes/new'
-import { Route as AuthedRoutesRouteIdRouteImport } from './routes/_authed/routes/$routeId'
 import { Route as AuthedDailyRouteIdRouteImport } from './routes/_authed/daily/$routeId'
+import { Route as AuthedRoutesRouteIdIndexRouteImport } from './routes/_authed/routes/$routeId/index'
+import { Route as AuthedRoutesRouteIdEditRouteImport } from './routes/_authed/routes/$routeId/edit'
 
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
@@ -71,14 +72,20 @@ const AuthedRoutesNewRoute = AuthedRoutesNewRouteImport.update({
   path: '/routes/new',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedRoutesRouteIdRoute = AuthedRoutesRouteIdRouteImport.update({
-  id: '/routes/$routeId',
-  path: '/routes/$routeId',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedDailyRouteIdRoute = AuthedDailyRouteIdRouteImport.update({
   id: '/daily/$routeId',
   path: '/daily/$routeId',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedRoutesRouteIdIndexRoute =
+  AuthedRoutesRouteIdIndexRouteImport.update({
+    id: '/routes/$routeId/',
+    path: '/routes/$routeId/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedRoutesRouteIdEditRoute = AuthedRoutesRouteIdEditRouteImport.update({
+  id: '/routes/$routeId/edit',
+  path: '/routes/$routeId/edit',
   getParentRoute: () => AuthedRoute,
 } as any)
 
@@ -90,10 +97,11 @@ export interface FileRoutesByFullPath {
   '/invoice': typeof AuthedInvoiceRoute
   '/settings': typeof AuthedSettingsRoute
   '/daily/$routeId': typeof AuthedDailyRouteIdRoute
-  '/routes/$routeId': typeof AuthedRoutesRouteIdRoute
   '/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/routes/': typeof AuthedRoutesIndexRoute
+  '/routes/$routeId/edit': typeof AuthedRoutesRouteIdEditRoute
+  '/routes/$routeId/': typeof AuthedRoutesRouteIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
@@ -103,10 +111,11 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthedSettingsRoute
   '/': typeof AuthedIndexRoute
   '/daily/$routeId': typeof AuthedDailyRouteIdRoute
-  '/routes/$routeId': typeof AuthedRoutesRouteIdRoute
   '/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/routes': typeof AuthedRoutesIndexRoute
+  '/routes/$routeId/edit': typeof AuthedRoutesRouteIdEditRoute
+  '/routes/$routeId': typeof AuthedRoutesRouteIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -118,10 +127,11 @@ export interface FileRoutesById {
   '/_authed/settings': typeof AuthedSettingsRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/daily/$routeId': typeof AuthedDailyRouteIdRoute
-  '/_authed/routes/$routeId': typeof AuthedRoutesRouteIdRoute
   '/_authed/routes/new': typeof AuthedRoutesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/routes/': typeof AuthedRoutesIndexRoute
+  '/_authed/routes/$routeId/edit': typeof AuthedRoutesRouteIdEditRoute
+  '/_authed/routes/$routeId/': typeof AuthedRoutesRouteIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -133,10 +143,11 @@ export interface FileRouteTypes {
     | '/invoice'
     | '/settings'
     | '/daily/$routeId'
-    | '/routes/$routeId'
     | '/routes/new'
     | '/api/auth/$'
     | '/routes/'
+    | '/routes/$routeId/edit'
+    | '/routes/$routeId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/reset-password'
@@ -146,10 +157,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/'
     | '/daily/$routeId'
-    | '/routes/$routeId'
     | '/routes/new'
     | '/api/auth/$'
     | '/routes'
+    | '/routes/$routeId/edit'
+    | '/routes/$routeId'
   id:
     | '__root__'
     | '/_authed'
@@ -160,10 +172,11 @@ export interface FileRouteTypes {
     | '/_authed/settings'
     | '/_authed/'
     | '/_authed/daily/$routeId'
-    | '/_authed/routes/$routeId'
     | '/_authed/routes/new'
     | '/api/auth/$'
     | '/_authed/routes/'
+    | '/_authed/routes/$routeId/edit'
+    | '/_authed/routes/$routeId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -246,18 +259,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedRoutesNewRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/routes/$routeId': {
-      id: '/_authed/routes/$routeId'
-      path: '/routes/$routeId'
-      fullPath: '/routes/$routeId'
-      preLoaderRoute: typeof AuthedRoutesRouteIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/daily/$routeId': {
       id: '/_authed/daily/$routeId'
       path: '/daily/$routeId'
       fullPath: '/daily/$routeId'
       preLoaderRoute: typeof AuthedDailyRouteIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/routes/$routeId/': {
+      id: '/_authed/routes/$routeId/'
+      path: '/routes/$routeId'
+      fullPath: '/routes/$routeId/'
+      preLoaderRoute: typeof AuthedRoutesRouteIdIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/routes/$routeId/edit': {
+      id: '/_authed/routes/$routeId/edit'
+      path: '/routes/$routeId/edit'
+      fullPath: '/routes/$routeId/edit'
+      preLoaderRoute: typeof AuthedRoutesRouteIdEditRouteImport
       parentRoute: typeof AuthedRoute
     }
   }
@@ -268,9 +288,10 @@ interface AuthedRouteChildren {
   AuthedSettingsRoute: typeof AuthedSettingsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedDailyRouteIdRoute: typeof AuthedDailyRouteIdRoute
-  AuthedRoutesRouteIdRoute: typeof AuthedRoutesRouteIdRoute
   AuthedRoutesNewRoute: typeof AuthedRoutesNewRoute
   AuthedRoutesIndexRoute: typeof AuthedRoutesIndexRoute
+  AuthedRoutesRouteIdEditRoute: typeof AuthedRoutesRouteIdEditRoute
+  AuthedRoutesRouteIdIndexRoute: typeof AuthedRoutesRouteIdIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -278,9 +299,10 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsRoute: AuthedSettingsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedDailyRouteIdRoute: AuthedDailyRouteIdRoute,
-  AuthedRoutesRouteIdRoute: AuthedRoutesRouteIdRoute,
   AuthedRoutesNewRoute: AuthedRoutesNewRoute,
   AuthedRoutesIndexRoute: AuthedRoutesIndexRoute,
+  AuthedRoutesRouteIdEditRoute: AuthedRoutesRouteIdEditRoute,
+  AuthedRoutesRouteIdIndexRoute: AuthedRoutesRouteIdIndexRoute,
 }
 
 const AuthedRouteWithChildren =

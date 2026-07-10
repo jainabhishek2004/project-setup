@@ -44,6 +44,10 @@ export default defineSchema({
     lng: v.number(),
     // Geofence radius in metres (default 100 when unset).
     radiusMeters: v.optional(v.number()),
+    // optional = ad-hoc hub (visited some days). Excluded from the regular
+    // optimized route line; still geofenced/captured when visited. Unset =
+    // planned (core, part of the everyday route).
+    optional: v.optional(v.boolean()),
     // legacy — was the scheduled expected time; unused by visit tracking.
     expectedMinutes: v.optional(v.number()),
   }).index('by_route', ['routeId']),

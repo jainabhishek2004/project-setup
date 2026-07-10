@@ -29,6 +29,11 @@ export type DayOverride = {
   notes?: string
 } | null
 
+// Indian vehicle registration, e.g. DL51GD8989, HR55AU0462, UP16AT0031,
+// DL1LAK9247 — 2 letters + 1-2 digits + 1-3 letters + 4 digits.
+const REG_RE = /^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}$/
+const cleanReg = (s: string) => s.trim().replace(/[\s-]/g, '').toUpperCase()
+
 export function RouteDayOverrideDialog({
   routeId,
   date,
@@ -65,18 +70,35 @@ export function RouteDayOverrideDialog({
   }
 
   const handleSave = async () => {
-    if (!vehicle.trim()) {
-      toast.error('Enter the vehicle that ran this day')
-      return
+    // Validate depending on the vehicle type.
+    if (thirdParty) {
+      if (!vendorName.trim()) {
+        toast.error('Enter the vendor name (e.g. Porter)')
+        return
+      }
+    } else {
+      if (!REG_RE.test(cleanReg(vehicle))) {
+        toast.error('Enter a valid vehicle number, e.g. DL51GD8989')
+        return
+      }
     }
+
+    // Own substitute → the (validated) registration; third-party → the vehicle
+    // if given, else the vendor name as the label.
+    const vehicleRegistration = thirdParty
+      ? vehicle.trim()
+        ? cleanReg(vehicle)
+        : vendorName.trim()
+      : cleanReg(vehicle)
+
     setSaving(true)
     try {
       await setOverride({
         routeId,
         date,
-        vehicleRegistration: vehicle.trim(),
+        vehicleRegistration,
         trackable: !thirdParty,
-        vendorName: thirdParty ? vendorName.trim() || undefined : undefined,
+        vendorName: thirdParty ? vendorName.trim() : undefined,
         vendorCost: thirdParty ? num(vendorCost) : undefined,
         manualKm: thirdParty ? num(manualKm) : undefined,
         reason: reason.trim() || undefined,
@@ -117,22 +139,13 @@ export function RouteDayOverrideDialog({
         <DialogHeader>
           <DialogTitle>Change vehicle for {date}</DialogTitle>
           <DialogDescription>
-            Default vehicle is <b>{defaultVehicle}</b>. Set the vehicle that
-            actually ran this day (breakdown substitute or a third-party
-            vehicle).
+            Default vehicle is <b>{defaultVehicle}</b>. Set the vehicle that ran
+            this day — a breakdown substitute (tracked live) or a third-party
+            vehicle (manual).
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
-          <div className="grid gap-2">
-            <Label>Vehicle number</Label>
-            <Input
-              value={vehicle}
-              onChange={(e) => setVehicle(e.target.value)}
-              placeholder="DL51GD1234 / PORTER"
-            />
-          </div>
-
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={thirdParty}
@@ -141,13 +154,27 @@ export function RouteDayOverrideDialog({
             Third-party vehicle (no IoT, e.g. Porter) — tracked manually
           </label>
 
-          {thirdParty && (
+          {!thirdParty ? (
+            <div className="grid gap-1.5">
+              <Label>Substitute vehicle number</Label>
+              <Input
+                value={vehicle}
+                onChange={(e) => setVehicle(e.target.value.toUpperCase())}
+                placeholder="DL51GD8989"
+                autoCapitalize="characters"
+              />
+              <p className="text-muted-foreground text-xs">
+                Must be a valid registration — it's tracked live via IoT.
+              </p>
+            </div>
+          ) : (
             <div className="grid gap-4 rounded-lg border p-3 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label className="text-xs">Vendor name</Label>
                 <Input
                   value={vendorName}
                   onChange={(e) => setVendorName(e.target.value)}
+                  placeholder="Porter"
                 />
               </div>
               <div className="grid gap-2">
@@ -159,13 +186,21 @@ export function RouteDayOverrideDialog({
                   placeholder="4500"
                 />
               </div>
-              <div className="grid gap-2 sm:col-span-2">
+              <div className="grid gap-2">
                 <Label className="text-xs">Km driven (manual)</Label>
                 <Input
                   value={manualKm}
                   onChange={(e) => setManualKm(e.target.value)}
                   inputMode="numeric"
                   placeholder="optional"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs">Vehicle number (optional)</Label>
+                <Input
+                  value={vehicle}
+                  onChange={(e) => setVehicle(e.target.value.toUpperCase())}
+                  placeholder="if known"
                 />
               </div>
             </div>

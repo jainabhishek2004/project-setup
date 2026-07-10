@@ -48,6 +48,15 @@ function minutesToLabel(minutes: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
+// Add days to a "YYYY-MM-DD" string (UTC math, no timezone drift).
+function addDays(dateStr: string, n: number) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + n)
+  const p = (x: number) => String(x).padStart(2, '0')
+  return `${dt.getUTCFullYear()}-${p(dt.getUTCMonth() + 1)}-${p(dt.getUTCDate())}`
+}
+
 function clockTime(ms: number) {
   return new Date(ms).toLocaleTimeString([], {
     hour: '2-digit',
@@ -59,6 +68,8 @@ function Dashboard() {
   const today = operationalDateString()
   const [selectedDate, setSelectedDate] = useState(today)
   const isToday = selectedDate === today
+  const isFuture = selectedDate > today
+  const maxDate = addDays(today, 14)
 
   const { data, isFetching } = useQuery({
     ...convexQuery(api.visits.dashboard, { date: selectedDate }),
@@ -83,19 +94,21 @@ function Dashboard() {
             )}
           </h2>
           <p className="text-muted-foreground text-sm">
-            {selectedDate} · 5 PM–7 AM (IST){isToday && ' · today'}
+            {selectedDate} · 5 PM–7 AM (IST)
+            {isToday && ' · today'}
+            {isFuture && ' · upcoming'}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div className="grid gap-1">
             <Label htmlFor="route-date" className="text-xs">
-              Date
+              Date (pick a future day to pre-assign a vehicle)
             </Label>
             <Input
               id="route-date"
               type="date"
               value={selectedDate}
-              max={today}
+              max={maxDate}
               onChange={(e) => setSelectedDate(e.target.value || today)}
               className="w-40"
             />
@@ -105,6 +118,13 @@ function Dashboard() {
               Today
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+            disabled={selectedDate >= maxDate}
+          >
+            Next day →
+          </Button>
         </div>
       </div>
 
@@ -146,6 +166,13 @@ function RouteVisitsCard({
   route: DashboardRoute
   date: string
 }) {
+  // Ad-hoc routes visit an unpredictable subset of the configured hubs, so we
+  // show only what was actually visited, ordered by when it happened — not a
+  // "hit/total" ratio or a list of everything that wasn't touched.
+  const visitedStops = [...route.stops]
+    .filter((s) => s.visits.length > 0)
+    .sort((a, b) => a.visits[0].enteredAt - b.visits[0].enteredAt)
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -174,7 +201,9 @@ function RouteVisitsCard({
                   {minutesToLabel(route.activeEndMinutes)}
                 </>
               )}{' '}
-            · {route.totalVisits} visit(s)
+            · {visitedStops.length} hub
+            {visitedStops.length === 1 ? '' : 's'} visited · {route.totalVisits}{' '}
+            visit(s)
             {route.override?.vendorCost != null && (
               <> · vendor cost ₹{route.override.vendorCost.toLocaleString()}</>
             )}
@@ -200,17 +229,21 @@ function RouteVisitsCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {route.stops.map((stop) => (
-          <div key={stop._id} className="rounded-lg border p-3">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <MapPin size={14} /> {stop.order + 1}. {stop.name}
-              </span>
-              <Badge variant={stop.visits.length > 0 ? 'default' : 'secondary'}>
-                {stop.visits.length} visit(s)
-              </Badge>
-            </div>
-            {stop.visits.length > 0 && (
+        {visitedStops.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No hubs visited yet today.
+          </p>
+        ) : (
+          visitedStops.map((stop) => (
+            <div key={stop._id} className="rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <MapPin size={14} /> {stop.name}
+                </span>
+                {stop.visits.length > 1 && (
+                  <Badge>{stop.visits.length} visits</Badge>
+                )}
+              </div>
               <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
                 {stop.visits.map((visit) => (
                   <li
@@ -234,9 +267,9 @@ function RouteVisitsCard({
                   </li>
                 ))}
               </ul>
-            )}
-          </div>
-        ))}
+            </div>
+          ))
+        )}
       </CardContent>
     </Card>
   )
